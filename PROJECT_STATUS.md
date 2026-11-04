@@ -22,6 +22,7 @@ Rollback tag: `pre-commercial-1.0-baseline-20261104` at `02199a4`.
 |---|---|---|
 | P0 | Mandatory named-admin bootstrap and fail-closed persistent startup | Implemented; Linux + Windows CI passed; interactive GUI acceptance pending |
 | P0 | Authorization audit of every public business service | Explicit registry + coverage test; Linux/Windows CI passed |
+| P0 | Audit handoff viewer/export boundary | Viewer reduced to read-only; exhaustive sensitive-API regression passed locally; Windows CI pending |
 | P0 | At-rest database and encrypted-backup/key-recovery design | Encrypted backup implemented; active SQLite encryption remains open |
 | P0 | Independent accounting reconciliation and statutory sign-off | Needs independent accountant/owner action |
 | P1 | Installer, upgrade preservation, least-privileged Windows acceptance | Per-user silent install/CLI/uninstall CI passed; real standard-user GUI and upgrade-data acceptance pending |
@@ -61,3 +62,10 @@ Output SHA-256 values:
 - `SabaAccounting-Setup.exe`: `20f73d57f3fb5ae7911c59f038a0e08363ce3c8c89d7a012bbef1dbbf956996b`
 - `SabaAccounting-Source.zip`: `e64dce7ac33f367d8dd30f444c13640735c92d931d464ce02d9b4f9fde173ad9`
 - Artifact bundle digest: `b67af545bed8465bc6169895aa496bcbbdac093b5bc8888a22e802d05764f066`
+
+The 0.6.5 audit handoff was compared with the full source at `1fb0cfa`.
+Locally, 191 tests pass after adding regression coverage for concurrent journal
+creation, old/new line schemas, cross-company report scope, viewer denial,
+non-overwriting backup and non-legal report labels. See
+`docs/AUDIT_HANDOFF_065_REPORT_FA.md`. Windows evidence for these changes is
+pending the post-push workflow and must be recorded before claiming that gate.

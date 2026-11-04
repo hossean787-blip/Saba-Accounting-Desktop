@@ -2,7 +2,9 @@
 Each mutating operation commits atomically or rolls back; default API is local single-user.
 """
 import csv
+import os
 import sqlite3
+import tempfile
 from contextlib import contextmanager, closing
 from pathlib import Path
 
@@ -163,6 +165,10 @@ class AccountingStore:
 
     @staticmethod
     def _insert_lines(conn, entry_id, lines):
+        # Schema compatibility is constant for the connection/database. Query
+        # once per document, not once per line (large journals may have hundreds).
+        cols={r['name'] for r in conn.execute('PRAGMA table_info(journal_lines)')}
+        has_detail = 'detail_id' in cols
         for i, line in enumerate(lines,1):
             account_id = int(line['account_id'])
             debit = int(line.get('debit',0))
@@ -172,8 +178,7 @@ class AccountingStore:
             if not ((debit>0) != (credit>0)):
                 raise AccountingError('در هر ردیف فقط بدهکار یا بستانکار باید مثبت باشد.')
             # v0.4 optional analytic dimensions; legacy AccountingStore stays usable.
-            cols={r['name'] for r in conn.execute('PRAGMA table_info(journal_lines)')}
-            if 'detail_id' in cols:
+            if has_detail:
                 conn.execute('''INSERT INTO journal_lines(entry_id,account_id,row_no,debit_rial,credit_rial,narration,party_id,cost_center_id,detail_id)
                                 VALUES (?,?,?,?,?,?,?,?,?)''',
                              (entry_id,account_id,i,debit,credit,line.get('narration',''),
@@ -403,11 +408,27 @@ th{{background:#dbe9f6}}tr:nth-child(even){{background:#f5f8fc}}
         if self.path.resolve() == dest.resolve():
             raise AccountingError('مسیر پشتیبان و پایگاه داده باید متفاوت باشند.')
         dest.parent.mkdir(parents=True,exist_ok=True)
-        with closing(self._connection()) as source, closing(sqlite3.connect(str(dest))) as copy:
-            source.backup(copy)
-        with closing(sqlite3.connect(str(dest))) as check:
-            if check.execute('PRAGMA integrity_check').fetchone()[0]!='ok':
-                raise AccountingError('فایل پشتیبان معتبر نیست.')
+        if dest.exists():
+            raise AccountingError('فایل مقصد وجود دارد؛ بازنویسی پشتیبان مجاز نیست.')
+        handle, temporary = tempfile.mkstemp(prefix='saba-backup-', suffix='.sqlite3',
+                                             dir=str(dest.parent))
+        os.close(handle)
+        try:
+            with closing(self._connection()) as source, closing(sqlite3.connect(temporary)) as copy:
+                source.backup(copy)
+            with closing(sqlite3.connect(temporary)) as check:
+                integrity = check.execute('PRAGMA integrity_check').fetchone()[0]
+                foreign_keys = check.execute('PRAGMA foreign_key_check').fetchall()
+                if integrity != 'ok' or foreign_keys:
+                    raise AccountingError('فایل پشتیبان معتبر نیست.')
+            # A hard link publishes the verified snapshot atomically and never
+            # replaces a file that appeared after the existence check.
+            try:
+                os.link(temporary, dest)
+            except FileExistsError as exc:
+                raise AccountingError('فایل مقصد وجود دارد؛ بازنویسی پشتیبان مجاز نیست.') from exc
+        finally:
+            Path(temporary).unlink(missing_ok=True)
         return str(dest)
 
     def set_root_class(self, company_id, root_id, account_class):

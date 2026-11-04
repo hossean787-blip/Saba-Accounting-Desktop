@@ -7,7 +7,8 @@ from .storage import AccountingError
 
 
 def show_finance(ui):
-    ui._clear('مرکز کنترل حسابداری مالی', 'پایان سال، تفصیلی شناور، اسناد اصلاحی و دفاتر قانونی داخلی')
+    ui._clear('مرکز کنترل حسابداری مالی',
+              'پایان سال، تفصیلی شناور و اسناد اصلاحی؛ گزارش‌ها داخلی‌اند و جایگزین دفاتر قانونی نیستند')
     if not ui.company_id or not ui.year_id:
         return ui._warning()
     from .ui import WHITE, BG, MUTED, TEXT, ACCENT, GOOD

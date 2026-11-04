@@ -19,7 +19,9 @@ _MAX_FAILURES = 5
 ROLE_PERMISSIONS = {
     "admin": frozenset({"read", "write", "post", "export", "backup", "manage_users"}),
     "accountant": frozenset({"read", "write", "post", "export", "backup"}),
-    "viewer": frozenset({"read", "export"}),
+    # Viewer/auditor may inspect data inside the controlled UI but cannot create
+    # portable copies of sensitive financial information.
+    "viewer": frozenset({"read"}),
 }
 # Every public business-service method is explicit. A newly added method is
 # denied until reviewed and classified; tests enforce coverage of this table.
