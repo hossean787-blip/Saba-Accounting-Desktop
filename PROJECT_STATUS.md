@@ -21,10 +21,10 @@ Rollback tag: `pre-commercial-1.0-baseline-20261104` at `02199a4`.
 | Priority | Work item | Status |
 |---|---|---|
 | P0 | Mandatory named-admin bootstrap and fail-closed persistent startup | Implemented; Linux + Windows CI passed; interactive GUI acceptance pending |
-| P0 | Authorization audit of every public business service | Explicit registry + coverage test implemented; CI pending |
+| P0 | Authorization audit of every public business service | Explicit registry + coverage test; Linux/Windows CI passed |
 | P0 | At-rest database and encrypted-backup/key-recovery design | Encrypted backup implemented; active SQLite encryption remains open |
 | P0 | Independent accounting reconciliation and statutory sign-off | Needs independent accountant/owner action |
-| P1 | Installer, upgrade preservation, least-privileged Windows acceptance | Per-user installer + silent install/uninstall CI implemented; CI pending |
+| P1 | Installer, upgrade preservation, least-privileged Windows acceptance | Per-user silent install/CLI/uninstall CI passed; real standard-user GUI and upgrade-data acceptance pending |
 | P1 | Interactive Windows 10/11 GUI, DPI, Persian print acceptance | Needs real Windows test machines |
 | P1 | Dependency/provenance, malware reputation and code signing | Partial; signing needs owner certificate |
 | P1 | User/admin/backup/support/licensing documentation | Pending |
@@ -45,3 +45,11 @@ and signing approvals.
   `cd838643303912910cd43037a0c48fbc37779ad99af374ee9cd23c4b2ad42201`.
 - Artifact archive digest: SHA-256
   `bcdbd8a86f5a45b63d7bdace3a14ffb1da73908df9e8be582361fa7d41a7b96b`.
+
+Commercial-hardening preview commit `93ae74f` passed Windows run
+`41829974148`: dependency/static scans, syntax, 185 tests, EXE build/smoke,
+per-user installer build, silent install, installed CLI smoke, uninstall, source
+archive and artifact upload. EXE SHA-256:
+`3d36cd4417208f1b875852275306f18027a6610c8b73f1a8fa6837993cffbf54`.
+Artifact bundle digest:
+`8effc02efba4a8294fcd9d339a3aa74e0062890d3c2e2e73d529d869d56a71e8`.

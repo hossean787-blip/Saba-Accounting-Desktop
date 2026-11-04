@@ -94,7 +94,9 @@ jobs:
           git archive --format=zip --output=dist/SabaAccounting-Source.zip HEAD
           Get-ChildItem dist -File | Where-Object Name -ne "SHA256SUMS.txt" | ForEach-Object {
             $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-            "$hash  $($_.Name)"
+            $line = "$hash  $($_.Name)"
+            Write-Host "OUTPUT SHA256: $line"
+            $line
           } | Set-Content -Encoding ascii "dist/SHA256SUMS.txt"
       - name: Upload Windows EXE, installer, source and checksums
         uses: actions/upload-artifact@v4
