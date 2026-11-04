@@ -53,3 +53,11 @@ archive and artifact upload. EXE SHA-256:
 `3d36cd4417208f1b875852275306f18027a6610c8b73f1a8fa6837993cffbf54`.
 Artifact bundle digest:
 `8effc02efba4a8294fcd9d339a3aa74e0062890d3c2e2e73d529d869d56a71e8`.
+
+Latest checksum-reporting run `41831250581` at commit `c3245af` also passed.
+Output SHA-256 values:
+
+- `SabaAccounting.exe`: `f33deda285f1c69ca02b6c64273e72bbace3862e1f90bd150820bd89f6ae95b9`
+- `SabaAccounting-Setup.exe`: `20f73d57f3fb5ae7911c59f038a0e08363ce3c8c89d7a012bbef1dbbf956996b`
+- `SabaAccounting-Source.zip`: `e64dce7ac33f367d8dd30f444c13640735c92d931d464ce02d9b4f9fde173ad9`
+- Artifact bundle digest: `b67af545bed8465bc6169895aa496bcbbdac093b5bc8888a22e802d05764f066`
