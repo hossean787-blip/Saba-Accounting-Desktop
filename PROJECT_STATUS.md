@@ -22,7 +22,7 @@ Rollback tag: `pre-commercial-1.0-baseline-20261104` at `02199a4`.
 |---|---|---|
 | P0 | Mandatory named-admin bootstrap and fail-closed persistent startup | Implemented; Linux + Windows CI passed; interactive GUI acceptance pending |
 | P0 | Authorization audit of every public business service | Explicit registry + coverage test; Linux/Windows CI passed |
-| P0 | Audit handoff viewer/export boundary | Viewer reduced to read-only; exhaustive sensitive-API regression passed locally; Windows CI pending |
+| P0 | Audit handoff viewer/export boundary | Viewer reduced to read-only; exhaustive sensitive-API regression passed on Linux and Windows CI |
 | P0 | At-rest database and encrypted-backup/key-recovery design | Encrypted backup implemented; active SQLite encryption remains open |
 | P0 | Independent accounting reconciliation and statutory sign-off | Needs independent accountant/owner action |
 | P1 | Installer, upgrade preservation, least-privileged Windows acceptance | Per-user silent install/CLI/uninstall CI passed; real standard-user GUI and upgrade-data acceptance pending |
@@ -67,5 +67,12 @@ The 0.6.5 audit handoff was compared with the full source at `1fb0cfa`.
 Locally, 191 tests pass after adding regression coverage for concurrent journal
 creation, old/new line schemas, cross-company report scope, viewer denial,
 non-overwriting backup and non-legal report labels. See
-`docs/AUDIT_HANDOFF_065_REPORT_FA.md`. Windows evidence for these changes is
-pending the post-push workflow and must be recorded before claiming that gate.
+`docs/AUDIT_HANDOFF_065_REPORT_FA.md`.
+
+Audit-handoff commit `4474741` passed Windows run `41836670336`: security
+checks, syntax, 191 tests, EXE build/smoke, per-user installer build, silent
+install/installed smoke/uninstall, source packaging and artifact upload. Windows
+artifact digest: `6a9d4947211268f565b126ec0405b8afbce36e201fffcf9f14aa289c7fe73834`.
+The artifact service returned a time-bound HTTP 403 to this Codex environment,
+so individual output hashes inside `SHA256SUMS.txt` were not independently
+downloaded and are not claimed here.
