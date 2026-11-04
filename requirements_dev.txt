@@ -1,0 +1,6 @@
+# Only for screenshot/QA helpers, not required by the application:
+pillow>=10,<13
+pip-audit==2.10.1
+bandit==1.9.4
+# Windows executable builder:
+pyinstaller>=6.12,<7
