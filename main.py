@@ -7,7 +7,8 @@ import tempfile
 from pathlib import Path
 
 from saba_accounting.access import (AuthorizedStore, LoginError, UserManager,
-                                    configured, set_password, verify_password, legacy_login_allowed)
+                                    configured, set_password, legacy_login_allowed,
+                                    named_users_configured)
 from saba_accounting.finance import FinanceStore
 from saba_accounting.demo_erp import seed_erp_demo
 from saba_accounting.demo_finance import seed_finance_demo
@@ -61,10 +62,11 @@ def main():
             username = input('نام کاربری مدیر: ').strip()
             new = getpass.getpass('رمز مدیر (حداقل ۱۲ نویسه): ')
             repeat = getpass.getpass('تکرار رمز مدیر: ')
+            legacy = getpass.getpass('رمز ورود قدیمی: ') if configured(path) and legacy_login_allowed(path) else None
             if new != repeat:
                 raise SystemExit('تکرار رمز مطابقت ندارد.')
             try:
-                UserManager(path).bootstrap_admin(username, new)
+                UserManager(path).bootstrap_admin(username, new, legacy_password=legacy)
             except LoginError as exc:
                 raise SystemExit(str(exc))
             print('مدیر اولیه ایجاد شد.')
@@ -86,31 +88,53 @@ def main():
             print('رمز ورود محلی تنظیم شد.')
             return
         session = None
-        if configured(path) and not (args.demo or args.demo_finance):
-            named_users = not legacy_login_allowed(path)
+        if not (args.demo or args.demo_finance):
             import tkinter as tk
             from tkinter import simpledialog, messagebox
             root=tk.Tk();root.withdraw()
             try:
+                if not named_users_configured(path):
+                    messagebox.showinfo(
+                        'راه‌اندازی امن',
+                        'پیش از استفاده از پایگاه دائمی باید مدیر نام‌دار ایجاد شود.',
+                        parent=root)
+                    username=simpledialog.askstring('ایجاد مدیر','نام کاربری مدیر:',parent=root)
+                    if not username:
+                        return
+                    display_name=simpledialog.askstring('ایجاد مدیر','نام نمایشی مدیر:',parent=root) or 'مدیر سیستم'
+                    new=simpledialog.askstring('ایجاد مدیر','رمز جدید (حداقل ۱۲ نویسه):',show='*',parent=root)
+                    if new is None:
+                        return
+                    repeat=simpledialog.askstring('ایجاد مدیر','تکرار رمز جدید:',show='*',parent=root)
+                    if repeat != new:
+                        messagebox.showerror('راه‌اندازی ناموفق','تکرار رمز مطابقت ندارد.',parent=root)
+                        return
+                    legacy=None
+                    if configured(path) and legacy_login_allowed(path):
+                        legacy=simpledialog.askstring('ارتقای امن','رمز ورود قدیمی:',show='*',parent=root)
+                        if legacy is None:
+                            return
+                    try:
+                        UserManager(path).bootstrap_admin(username,new,display_name,legacy)
+                    except LoginError as exc:
+                        messagebox.showerror('راه‌اندازی ناموفق',str(exc),parent=root)
+                        return
+                    messagebox.showinfo('راه‌اندازی امن','مدیر ایجاد شد؛ اکنون وارد شوید.',parent=root)
                 authorized=False
                 for _ in range(3):
-                    username=simpledialog.askstring('حسابداری صبا','نام کاربری (برای ورود قدیمی خالی بگذارید):',parent=root)
+                    username=simpledialog.askstring('حسابداری صبا','نام کاربری:',parent=root)
                     if username is None:
                         return
-                    if named_users and not username.strip():
-                        messagebox.showerror('ورود ناموفق', 'در حالت چندکاربره نام کاربری الزامی است.', parent=root)
+                    if not username.strip():
+                        messagebox.showerror('ورود ناموفق', 'نام کاربری الزامی است.', parent=root)
                         continue
                     entered=simpledialog.askstring('حسابداری صبا','رمز ورود:',show='*',parent=root)
                     if entered is None:
                         return
                     try:
-                        if username.strip():
-                            session=UserManager(path).authenticate(username,entered)
-                            authorized=True
-                            break
-                        if not named_users and verify_password(path,entered):
-                            authorized=True
-                            break
+                        session=UserManager(path).authenticate(username,entered)
+                        authorized=True
+                        break
                     except LoginError as exc:
                         messagebox.showerror('ورود ناموفق',str(exc),parent=root)
                         continue

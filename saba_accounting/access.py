@@ -114,6 +114,16 @@ def configured(db_path):
                 or conn.execute("SELECT 1 FROM local_login WHERE singleton=1").fetchone() is not None)
 
 
+def named_users_configured(db_path):
+    """Return whether a named active account can authenticate.
+
+    Commercial persistent mode must never treat the legacy shared password as
+    sufficient authorization.
+    """
+    with closing(_connect(db_path)) as conn:
+        return conn.execute("SELECT 1 FROM app_users WHERE is_active=1 LIMIT 1").fetchone() is not None
+
+
 def legacy_login_allowed(db_path):
     """Disable the shared-password login as soon as named accounts exist.
 
@@ -193,10 +203,18 @@ class UserManager:
     def __init__(self, db_path):
         self.path = Path(db_path)
 
-    def bootstrap_admin(self, username, password, display_name="مدیر سیستم"):
+    def bootstrap_admin(self, username, password, display_name="مدیر سیستم", legacy_password=None):
         with closing(_connect(self.path)) as conn:
+            conn.execute("BEGIN IMMEDIATE")
             if conn.execute("SELECT 1 FROM app_users LIMIT 1").fetchone():
                 raise LoginError("راه‌اندازی مدیر فقط برای پایگاه بدون کاربر مجاز است.")
+            legacy = conn.execute(
+                "SELECT salt,secret,iterations FROM local_login WHERE singleton=1"
+            ).fetchone()
+            if legacy and not _matches(legacy, legacy_password):
+                _event(conn, username, "ADMIN_BOOTSTRAP", False, "invalid-legacy-credential")
+                conn.commit()
+                raise LoginError("برای ارتقای امن، رمز ورود قدیمی صحیح لازم است.")
             return self._insert_user(conn, username, password, display_name, "admin")
 
     def _insert_user(self, conn, username, password, display_name, role):

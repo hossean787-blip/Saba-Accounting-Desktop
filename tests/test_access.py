@@ -7,7 +7,7 @@ from pathlib import Path
 from contextlib import closing
 from saba_accounting.access import (AuthorizedStore, LoginError, PermissionDenied,
                                     UserManager, configured, legacy_login_allowed, set_password,
-                                    verify_password)
+                                    verify_password, named_users_configured)
 from saba_accounting.finance import FinanceStore
 
 class LocalLoginTests(unittest.TestCase):
@@ -43,7 +43,14 @@ class LocalLoginTests(unittest.TestCase):
         self.assertTrue(legacy_login_allowed(self.db))
         self.assertTrue(verify_password(self.db, 'shared-password-123'))
         users = UserManager(self.db)
-        users.bootstrap_admin('admin', 'Admin-passphrase-123')
+        self.assertFalse(named_users_configured(self.db))
+        with self.assertRaisesRegex(LoginError, 'رمز ورود قدیمی'):
+            users.bootstrap_admin('admin', 'Admin-passphrase-123')
+        with self.assertRaisesRegex(LoginError, 'رمز ورود قدیمی'):
+            users.bootstrap_admin('admin', 'Admin-passphrase-123', legacy_password='wrong password')
+        self.assertFalse(named_users_configured(self.db))
+        users.bootstrap_admin('admin', 'Admin-passphrase-123', legacy_password='shared-password-123')
+        self.assertTrue(named_users_configured(self.db))
         self.assertFalse(legacy_login_allowed(self.db))
         self.assertFalse(verify_password(self.db, 'shared-password-123'))
         with self.assertRaises(LoginError):
