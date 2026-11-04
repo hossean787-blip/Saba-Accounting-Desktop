@@ -1,4 +1,36 @@
+# Python
 __pycache__/
-*.db
-*.sqlite*
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+build/
+dist/
+*.egg-info/
+
+# Secret material / local state
 .env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.sqlite-*
+*.bak
+*.backup
+*.zip
+
+# Extracted third-party reference material (never publish)
+docs/reference/
+Sepidar_All_Extracted_For_Saba_FA*.txt
+
+# Local IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
