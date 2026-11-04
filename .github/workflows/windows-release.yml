@@ -3,6 +3,11 @@ on:
   workflow_dispatch:
   push:
     branches: [develop]
+    paths:
+      - 'main.py'
+      - 'saba_accounting/**'
+      - 'tests/**'
+      - '.github/workflows/windows-release.yml'
   pull_request:
     branches: [develop, main]
 permissions:
