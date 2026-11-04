@@ -21,10 +21,10 @@ Rollback tag: `pre-commercial-1.0-baseline-20261104` at `02199a4`.
 | Priority | Work item | Status |
 |---|---|---|
 | P0 | Mandatory named-admin bootstrap and fail-closed persistent startup | Implemented; Linux + Windows CI passed; interactive GUI acceptance pending |
-| P0 | Authorization audit of every public business service | Pending |
-| P0 | At-rest database and encrypted-backup/key-recovery design | Pending architecture/security review |
+| P0 | Authorization audit of every public business service | Explicit registry + coverage test implemented; CI pending |
+| P0 | At-rest database and encrypted-backup/key-recovery design | Encrypted backup implemented; active SQLite encryption remains open |
 | P0 | Independent accounting reconciliation and statutory sign-off | Needs independent accountant/owner action |
-| P1 | Installer, upgrade preservation, least-privileged Windows acceptance | Pending |
+| P1 | Installer, upgrade preservation, least-privileged Windows acceptance | Per-user installer + silent install/uninstall CI implemented; CI pending |
 | P1 | Interactive Windows 10/11 GUI, DPI, Persian print acceptance | Needs real Windows test machines |
 | P1 | Dependency/provenance, malware reputation and code signing | Partial; signing needs owner certificate |
 | P1 | User/admin/backup/support/licensing documentation | Pending |

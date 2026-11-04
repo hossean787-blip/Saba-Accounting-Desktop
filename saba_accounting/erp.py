@@ -44,8 +44,9 @@ class ERPStore(AccountingStore):
         if category not in tables:
             raise AccountingError('نوع داده مرجع نامعتبر است.')
         with closing(self._connection()) as conn:
+            # Identifier comes exclusively from the closed mapping above.
             return [dict(row) for row in conn.execute(
-                'SELECT * FROM ' + tables[category] + ' WHERE company_id=? ORDER BY id',
+                'SELECT * FROM ' + tables[category] + ' WHERE company_id=? ORDER BY id',  # nosec B608
                 (company_id,))]
 
     @staticmethod
@@ -86,7 +87,8 @@ class ERPStore(AccountingStore):
         if table not in ('parties','erp_cashboxes','erp_items','erp_employees',
                          'erp_assets','erp_warehouses','erp_projects'):
             raise AccountingError('نوع موجودیت نامعتبر است.')
-        return self._require(self._row(conn,'SELECT * FROM '+table+' WHERE company_id=? AND id=?',
+        # Identifier is checked against the closed tuple above; values are bound.
+        return self._require(self._row(conn,'SELECT * FROM '+table+' WHERE company_id=? AND id=?',  # nosec B608
                                        (company_id,ident)),'موجودیت در شرکت انتخابی یافت نشد.')
 
     def _settings(self, conn, company_id, *needed):
@@ -131,7 +133,8 @@ class ERPStore(AccountingStore):
             for key,account in accounts.items():
                 if account is not None:self._account(conn,company_id,account)
             conn.execute('INSERT OR IGNORE INTO erp_config(company_id) VALUES (?)',(company_id,))
-            conn.execute('UPDATE erp_config SET '+','.join(k+'=?' for k in accounts)+' WHERE company_id=?',
+            # Column identifiers are a subset of the constant ACCOUNT_KEYS.
+            conn.execute('UPDATE erp_config SET '+','.join(k+'=?' for k in accounts)+' WHERE company_id=?',  # nosec B608
                          list(accounts.values())+[company_id])
             self._log(conn,company_id,'CONFIG','erp_config',company_id,','.join(accounts.keys()))
 
@@ -504,7 +507,8 @@ class ERPStore(AccountingStore):
             for key,table in tables.items():
                 if table=='erp_depreciation':
                     q='SELECT COUNT(*) FROM erp_depreciation d JOIN erp_assets a ON a.id=d.asset_id WHERE a.company_id=?'
-                else:q='SELECT COUNT(*) FROM '+table+' WHERE company_id=?'
+                # table comes from the local constant mapping in this method.
+                else:q='SELECT COUNT(*) FROM '+table+' WHERE company_id=?'  # nosec B608
                 result[key]=conn.execute(q,(company_id,)).fetchone()[0]
         return result
 
@@ -525,12 +529,15 @@ class ERPStore(AccountingStore):
                       WHERE j.company_id=? AND j.status='posted' GROUP BY j.id''',(company_id,)):
                 if row['balance']!=0:issues.append('Unbalanced journal '+str(row['id']))
             # Documents posted through ERP must still resolve to posted journals for the same company.
-            for table,column in [('erp_cash_flows','entry_id'),('erp_invoices','entry_id'),
-                                 ('erp_payroll','entry_id'),('erp_production','entry_id'),
-                                 ('erp_project_costs','entry_id')]:
-                invalid=conn.execute('''SELECT COUNT(*) FROM '''+table+''' d LEFT JOIN journal_entries j
-                          ON j.id=d.entry_id AND j.company_id=d.company_id
-                          WHERE d.company_id=? AND (j.id IS NULL OR j.status!='posted')''',(company_id,)).fetchone()[0]
+            checks = {
+                'erp_cash_flows': "SELECT COUNT(*) FROM erp_cash_flows d LEFT JOIN journal_entries j ON j.id=d.entry_id AND j.company_id=d.company_id WHERE d.company_id=? AND (j.id IS NULL OR j.status!='posted')",
+                'erp_invoices': "SELECT COUNT(*) FROM erp_invoices d LEFT JOIN journal_entries j ON j.id=d.entry_id AND j.company_id=d.company_id WHERE d.company_id=? AND (j.id IS NULL OR j.status!='posted')",
+                'erp_payroll': "SELECT COUNT(*) FROM erp_payroll d LEFT JOIN journal_entries j ON j.id=d.entry_id AND j.company_id=d.company_id WHERE d.company_id=? AND (j.id IS NULL OR j.status!='posted')",
+                'erp_production': "SELECT COUNT(*) FROM erp_production d LEFT JOIN journal_entries j ON j.id=d.entry_id AND j.company_id=d.company_id WHERE d.company_id=? AND (j.id IS NULL OR j.status!='posted')",
+                'erp_project_costs': "SELECT COUNT(*) FROM erp_project_costs d LEFT JOIN journal_entries j ON j.id=d.entry_id AND j.company_id=d.company_id WHERE d.company_id=? AND (j.id IS NULL OR j.status!='posted')",
+            }
+            for table, query in checks.items():
+                invalid=conn.execute(query,(company_id,)).fetchone()[0]
                 if invalid:issues.append(table+' has '+str(invalid)+' unposted/mis-scoped journals')
             invalid=conn.execute('''SELECT COUNT(*) FROM erp_depreciation d JOIN erp_assets a ON a.id=d.asset_id
                 LEFT JOIN journal_entries j ON j.id=d.entry_id AND j.company_id=a.company_id

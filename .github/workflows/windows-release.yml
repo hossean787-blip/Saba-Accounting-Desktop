@@ -24,6 +24,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: pip
+      - name: Install pinned runtime dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+      - name: Dependency and static security checks
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check "pip-audit==2.10.1" "bandit==1.9.4"
+          python -m pip_audit -r requirements.txt
+          if ($LASTEXITCODE -ne 0) { throw "Dependency audit failed" }
+          bandit -q -r saba_accounting main.py -x tests --confidence-level medium
+          if ($LASTEXITCODE -ne 0) { throw "Static security scan failed" }
       - name: Python syntax check
         run: python -m compileall -q main.py saba_accounting tests
       - name: Automated tests
@@ -59,12 +70,40 @@ jobs:
         run: |
           $p = Start-Process -FilePath (Resolve-Path "dist/SabaAccounting.exe") -ArgumentList "--help" -PassThru -Wait
           if ($p.ExitCode -ne 0) { throw "EXE --help returned exit code $($p.ExitCode)" }
-      - name: Upload Windows EXE and checksum
+      - name: Build and smoke-test per-user installer
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup installation failed" }
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "installer\SabaAccounting.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Installer build failed" }
+          $install = Join-Path $env:RUNNER_TEMP "SabaInstalled"
+          $log = Join-Path $env:RUNNER_TEMP "saba-install.log"
+          $p = Start-Process "dist\SabaAccounting-Setup.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/DIR=$install", "/LOG=$log" -PassThru -Wait
+          if ($p.ExitCode -ne 0) { throw "Silent install failed: $($p.ExitCode)" }
+          if (-not (Test-Path "$install\SabaAccounting.exe")) { throw "Installed EXE missing" }
+          $p = Start-Process "$install\SabaAccounting.exe" -ArgumentList "--help" -PassThru -Wait
+          if ($p.ExitCode -ne 0) { throw "Installed EXE smoke failed" }
+          $uninstaller = Get-ChildItem $install -Filter "unins*.exe" | Select-Object -First 1
+          if (-not $uninstaller) { throw "Uninstaller missing" }
+          $p = Start-Process $uninstaller.FullName -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -PassThru -Wait
+          if ($p.ExitCode -ne 0) { throw "Silent uninstall failed" }
+      - name: Package source and output checksums
+        shell: pwsh
+        run: |
+          git archive --format=zip --output=dist/SabaAccounting-Source.zip HEAD
+          Get-ChildItem dist -File | Where-Object Name -ne "SHA256SUMS.txt" | ForEach-Object {
+            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $($_.Name)"
+          } | Set-Content -Encoding ascii "dist/SHA256SUMS.txt"
+      - name: Upload Windows EXE, installer, source and checksums
         uses: actions/upload-artifact@v4
         with:
           name: SabaAccounting-Windows
           path: |
             dist/SabaAccounting.exe
+            dist/SabaAccounting-Setup.exe
+            dist/SabaAccounting-Source.zip
             dist/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 90

@@ -31,9 +31,10 @@ def main():
     parser.add_argument('--bootstrap-admin',action='store_true',help='Create the first named administrator')
     parser.add_argument('--verify-backup',metavar='FILE',help='Verify a backup and its SHA-256 receipt, then exit')
     parser.add_argument('--restore-backup',metavar='FILE',help='Recover a verified backup to a new database')
+    parser.add_argument('--restore-encrypted',metavar='FILE',help='Recover an encrypted backup to a new database')
     parser.add_argument('--restore-to',metavar='FILE',help='Destination for --restore-backup (must not exist)')
     args=parser.parse_args()
-    if args.verify_backup or args.restore_backup or args.restore_to:
+    if args.verify_backup or args.restore_backup or args.restore_encrypted or args.restore_to:
         from saba_accounting.recovery import verify_backup, restore_to_new_database
         try:
             if args.verify_backup and not args.restore_backup and not args.restore_to:
@@ -41,11 +42,19 @@ def main():
                 # ASCII remains reliable in redirected legacy Windows consoles.
                 print('Backup verified; SHA-256:', result['sha256'])
                 return
-            if args.restore_backup and args.restore_to and not args.verify_backup:
+            if args.restore_backup and args.restore_to and not args.verify_backup and not args.restore_encrypted:
                 result = restore_to_new_database(args.restore_backup, args.restore_to)
                 print('Backup restored to new database:', result['path'])
                 return
-            parser.error('برای بازیابی، هر دو گزینه --restore-backup و --restore-to لازم است.')
+            if args.restore_encrypted and args.restore_to and not args.verify_backup and not args.restore_backup:
+                if not sys.stdin.isatty():
+                    raise SystemExit('بازیابی رمزگذاری‌شده نیاز به ترمینال تعاملی دارد.')
+                from saba_accounting.encrypted_backup import restore_encrypted_backup
+                password = getpass.getpass('عبارت بازیابی: ')
+                result = restore_encrypted_backup(args.restore_encrypted, args.restore_to, password)
+                print('Encrypted backup restored to new database:', result['path'])
+                return
+            parser.error('یک نوع پشتیبان و گزینه --restore-to لازم است؛ دو نوع بازیابی را هم‌زمان انتخاب نکنید.')
         except (OSError, ValueError) as exc:
             parser.exit(2, str(exc) + '\n')
     if args.demo or args.demo_finance:

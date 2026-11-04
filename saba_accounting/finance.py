@@ -172,12 +172,14 @@ class FinanceStore(ERPStore):
     @staticmethod
     def _balances(conn,company_id,year_id,kinds=('regular','adjustment','opening')):
         qs=','.join('?' for _ in kinds)
-        return [dict(x) for x in conn.execute('''SELECT l.account_id,l.detail_id,l.party_id,l.cost_center_id,
+        # Only the number of bound placeholders is generated; kinds remain values.
+        query = ('''SELECT l.account_id,l.detail_id,l.party_id,l.cost_center_id,
           SUM(l.debit_rial-l.credit_rial) AS balance
           FROM journal_lines l JOIN journal_entries j ON j.id=l.entry_id
           WHERE j.company_id=? AND j.fiscal_year_id=? AND j.status='posted' AND j.entry_kind IN ('''+qs+''')
           GROUP BY l.account_id,l.detail_id,l.party_id,l.cost_center_id
-          HAVING SUM(l.debit_rial-l.credit_rial)!=0''',(company_id,year_id,*kinds))]
+          HAVING SUM(l.debit_rial-l.credit_rial)!=0''')  # nosec B608
+        return [dict(x) for x in conn.execute(query,(company_id,year_id,*kinds))]
 
     @staticmethod
     def _make_line(r,reverse=False):
@@ -263,7 +265,7 @@ class FinanceStore(ERPStore):
             if account_ids:
                 marks = ','.join('?' for _ in account_ids)
                 account_names = {r['id']: (r['code'], r['title']) for r in conn.execute(
-                    'SELECT id,code,title FROM accounts WHERE company_id=? AND id IN ('+marks+')',
+                    'SELECT id,code,title FROM accounts WHERE company_id=? AND id IN ('+marks+')',  # nosec B608
                     (company_id, *sorted(account_ids)))}
             detail_names = {}
             for table, label in (('floating_details','detail_id'), ('parties','party_id'),
@@ -274,7 +276,7 @@ class FinanceStore(ERPStore):
                 if ids:
                     marks=','.join('?' for _ in ids)
                     detail_names[label]={r['id']: r['title'] for r in conn.execute(
-                        'SELECT id,'+('name' if table=='parties' else 'title')+' AS title FROM '+table+' WHERE company_id=? AND id IN ('+marks+')',
+                        'SELECT id,'+('name' if table=='parties' else 'title')+' AS title FROM '+table+' WHERE company_id=? AND id IN ('+marks+')',  # nosec B608
                         (company_id,*sorted(ids)))}
                 else:
                     detail_names[label]={}
@@ -383,13 +385,13 @@ class FinanceStore(ERPStore):
     def trial_balance(self, company_id, year_id, include_closing=False):
         self._year(company_id,year_id)
         predicate='' if include_closing else " AND j.entry_kind NOT IN ('result_close','balance_close')"
-        query='''SELECT a.id,a.code,a.title,a.level,
+        query=('''SELECT a.id,a.code,a.title,a.level,
           COALESCE(SUM(CASE WHEN j.status='posted' AND j.fiscal_year_id=?'''+predicate+''' THEN l.debit_rial ELSE 0 END),0) AS debit,
           COALESCE(SUM(CASE WHEN j.status='posted' AND j.fiscal_year_id=?'''+predicate+''' THEN l.credit_rial ELSE 0 END),0) AS credit
           FROM accounts a LEFT JOIN journal_lines l ON l.account_id=a.id
           LEFT JOIN journal_entries j ON j.id=l.entry_id
           WHERE a.company_id=? AND a.is_postable=1
-          GROUP BY a.id ORDER BY a.code'''
+          GROUP BY a.id ORDER BY a.code''')  # nosec B608
         return self._read_all(query,(year_id,year_id,company_id))
 
     def trial_balance_levels(self,company_id,year_id,level=4):
@@ -522,23 +524,24 @@ class FinanceStore(ERPStore):
         """
         self._year(company_id, year_id)
         extra = "" if include_closing else " AND j.entry_kind NOT IN ('result_close','balance_close')"
-        journal = self._read_all("""SELECT a.id account_id,
+        journal_sql = ("""SELECT a.id account_id,
             SUM(l.debit_rial) debit, SUM(l.credit_rial) credit
             FROM journal_entries j
             JOIN journal_lines l ON l.entry_id=j.id
             JOIN accounts a ON a.id=l.account_id
             WHERE j.company_id=? AND j.fiscal_year_id=? AND j.status='posted'
-              AND a.company_id=?""" + extra + """ GROUP BY a.id""",
-            (company_id, year_id, company_id))
+              AND a.company_id=?""" + extra + """ GROUP BY a.id""")  # nosec B608
+        journal = self._read_all(journal_sql, (company_id, year_id, company_id))
         by_journal={r['account_id']:r for r in journal}
         trial=self.trial_balance(company_id,year_id,include_closing=include_closing)
         by_trial={r['id']:r for r in trial}
         # A separate per-account ledger aggregation, not derived from the trial.
-        ledger=self._read_all("""SELECT l.account_id, SUM(l.debit_rial) debit,
+        ledger_sql=("""SELECT l.account_id, SUM(l.debit_rial) debit,
             SUM(l.credit_rial) credit FROM journal_lines l
             JOIN journal_entries j ON j.id=l.entry_id
             WHERE j.company_id=? AND j.fiscal_year_id=? AND j.status='posted' """
-            + extra + """ GROUP BY l.account_id""",(company_id,year_id))
+            + extra + """ GROUP BY l.account_id""")  # nosec B608
+        ledger=self._read_all(ledger_sql,(company_id,year_id))
         by_ledger={r['account_id']:r for r in ledger}
         differences=[]
         for account_id in sorted(set(by_journal)|set(by_trial)|set(by_ledger)):
@@ -681,6 +684,19 @@ class FinanceStore(ERPStore):
             raise
         finally:
             tmp.unlink(missing_ok=True)
+
+    def encrypted_backup(self, destination, passphrase, company_id=None):
+        """Create a consistent, authenticated encrypted backup.
+
+        A plaintext snapshot exists only in a private temporary directory for
+        the duration of encryption and is removed before return.
+        """
+        from .encrypted_backup import encrypt_verified_backup
+        dest = Path(destination)
+        with tempfile.TemporaryDirectory(prefix="saba_encrypt_") as folder:
+            plain = Path(folder) / "snapshot.sqlite3"
+            self.verified_backup(plain, company_id)
+            return encrypt_verified_backup(plain, dest, passphrase)
 
     def _company_check_for_backup(self, company_id):
         with closing(self._connection()) as conn:

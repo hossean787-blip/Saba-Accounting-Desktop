@@ -84,6 +84,16 @@ class AccountingStore:
     def companies(self):
         return self._read_all('SELECT id,name FROM companies ORDER BY id DESC')
 
+    def audit_events(self, company_id, limit=100):
+        """Company-scoped audit view; avoids exposing raw SQL/private storage APIs."""
+        limit = max(1, min(int(limit), 1000))
+        if not self._read_one('SELECT id FROM companies WHERE id=?', (company_id,)):
+            raise AccountingError('شرکت معتبر نیست.')
+        return self._read_all(
+            'SELECT event_time,event_type,target_type,target_id,note '
+            'FROM audit_events WHERE company_id=? ORDER BY id DESC LIMIT ?',
+            (company_id, limit))
+
     def create_fiscal_year(self, company_id, code, start_jalali, end_jalali):
         if not str(code).strip():
             raise AccountingError('کد سال مالی الزامی است.')
@@ -129,7 +139,8 @@ class AccountingStore:
         return cur.lastrowid
 
     def accounts(self, company_id, postable_only=False):
-        return self._read_all('SELECT id,company_id,code,title,parent_id,level,nature,is_postable,is_active,account_class FROM accounts WHERE company_id=?' +
+        # Optional clause is a fixed boolean choice, never user SQL.
+        return self._read_all('SELECT id,company_id,code,title,parent_id,level,nature,is_postable,is_active,account_class FROM accounts WHERE company_id=?' +  # nosec B608
                               (' AND is_postable=1 AND is_active=1' if postable_only else '')+' ORDER BY code', (company_id,))
 
     def new_draft(self, company_id, year_id, jalali_day, description, lines, source=None):

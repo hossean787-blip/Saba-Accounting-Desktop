@@ -1,6 +1,6 @@
 """Functional financial-control workbench for Saba v0.4 Tk desktop."""
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
+from tkinter import ttk, messagebox, filedialog, simpledialog
 from datetime import date
 from .jalali import display_jalali, fmt_rial
 from .storage import AccountingError
@@ -283,16 +283,30 @@ def show_finance(ui):
     ui._label(logs,'تاریخچه رویدادهای مالی',12,bold=True,bg=WHITE).pack(anchor='e',padx=16,pady=(14,2))
     table_events=ui._make_table(logs,[('time','زمان'),('event','رویداد'),('target','نوع'),('id','شناسه'),('note','شرح')],
                                   [160,115,115,80,300],height=9)
-    events=store._read_all('SELECT event_time,event_type,target_type,target_id,note FROM audit_events WHERE company_id=? ORDER BY id DESC LIMIT 100',(company,))
+    events=store.audit_events(company, 100)
     for event in events:
         table_events.insert('','end',values=(event['event_time'],event['event_type'],event['target_type'],event['target_id'],event['note']))
 
 
-    # Explicit, opt-in backup with hash receipt. Plain SQLite is NOT encrypted.
-    safety=add_tab('پشتیبان آزمایشی')
+    # Encrypted backup is the safe default. Plain backup remains available only
+    # for controlled migration/diagnostics and is clearly marked unsafe.
+    safety=add_tab('پشتیبان و بازیابی')
     bc=ui._card(safety);bc.pack(fill='x',padx=6,pady=14)
-    ui._label(bc,'پشتیبان‌گیری با کنترل یکپارچگی و رسید SHA-256',13,bg=WHITE,bold=True).pack(anchor='e',padx=16,pady=12)
-    ui._label(bc,'هشدار: این فایل رمزگذاری نشده است؛ برای داده واقعی مناسب نیست.',10,MUTED,bg=WHITE).pack(anchor='e',padx=16,pady=8)
+    ui._label(bc,'پشتیبان رمزگذاری‌شده و قابل بازیابی',13,bg=WHITE,bold=True).pack(anchor='e',padx=16,pady=12)
+    ui._label(bc,'عبارت بازیابی ذخیره نمی‌شود؛ آن را در محل امن و جداگانه نگهداری کنید.',10,MUTED,bg=WHITE).pack(anchor='e',padx=16,pady=8)
+    def make_encrypted_backup():
+        path=filedialog.asksaveasfilename(defaultextension='.sabaenc',filetypes=[('Saba encrypted backup','*.sabaenc')],initialfile='saba-backup.sabaenc')
+        if not path:return
+        password=simpledialog.askstring('عبارت بازیابی','عبارت بازیابی (حداقل ۱۲ نویسه):',show='*',parent=ui.root)
+        if password is None:return
+        repeat=simpledialog.askstring('تکرار عبارت','عبارت بازیابی را تکرار کنید:',show='*',parent=ui.root)
+        if repeat != password:return ui._error('تکرار عبارت بازیابی مطابقت ندارد.')
+        try:
+            result=store.encrypted_backup(path,password,company_id=company)
+            messagebox.showinfo('پشتیبان امن','پشتیبان رمزگذاری‌شده ایجاد شد.\nرسید: '+result['receipt'])
+        except Exception as exc:ui._error(exc)
+    ui._button(bc,'ساخت پشتیبان رمزگذاری‌شده',make_encrypted_backup,True).pack(anchor='e',padx=16,pady=10)
+    ui._label(bc,'گزینه زیر plaintext است و فقط برای مهاجرت کنترل‌شده استفاده شود.',9,MUTED,bg=WHITE).pack(anchor='e',padx=16,pady=(12,2))
     def make_verified_backup():
         path=filedialog.asksaveasfilename(defaultextension='.sqlite3',filetypes=[('SQLite','*.sqlite3')],initialfile='saba-backup.sqlite3')
         if not path:return
@@ -300,4 +314,4 @@ def show_finance(ui):
             result=store.verified_backup(path,company_id=company)
             messagebox.showinfo('پشتیبان آزمایشی','نسخه معتبر ایجاد شد.\nرسید: '+result['receipt'])
         except Exception as exc:ui._error(exc)
-    ui._button(bc,'ساخت پشتیبان و رسید',make_verified_backup,True).pack(anchor='e',padx=16,pady=16)
+    ui._button(bc,'ساخت پشتیبان plaintext و رسید',make_verified_backup).pack(anchor='e',padx=16,pady=10)

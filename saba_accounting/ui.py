@@ -373,11 +373,16 @@ class SabaUI:
         if self.company_id:
             b=tk.Frame(self.content,bg=BG); b.pack(fill='x',pady=9)
             def do_backup():
-                path=filedialog.asksaveasfilename(title='پشتیبان پایگاه داده',defaultextension='.sqlite3',filetypes=[('پایگاه داده SQLite','*.sqlite3')],initialfile='saba-backup.sqlite3')
+                from tkinter import simpledialog
+                path=filedialog.asksaveasfilename(title='پشتیبان رمزگذاری‌شده',defaultextension='.sabaenc',filetypes=[('پشتیبان رمزگذاری‌شده صبا','*.sabaenc')],initialfile='saba-backup.sabaenc')
                 if path:
-                    try:self.store.backup(path);messagebox.showinfo('تکمیل شد','پشتیبان کنترل‌شده ایجاد شد.')
+                    password=simpledialog.askstring('عبارت بازیابی','عبارت بازیابی (حداقل ۱۲ نویسه):',show='*',parent=self.root)
+                    if password is None:return
+                    repeat=simpledialog.askstring('تکرار عبارت','عبارت بازیابی را تکرار کنید:',show='*',parent=self.root)
+                    if repeat != password:return self._error('تکرار عبارت بازیابی مطابقت ندارد.')
+                    try:self.store.encrypted_backup(path,password,self.company_id);messagebox.showinfo('تکمیل شد','پشتیبان رمزگذاری‌شده ایجاد شد.')
                     except Exception as e:self._error(e)
-            self._button(b,'تهیه پشتیبان از اطلاعات',do_backup).pack(side='right')
+            self._button(b,'تهیه پشتیبان رمزگذاری‌شده',do_backup).pack(side='right')
             years=self.store.fiscal_years(self.company_id)
             self._label(self.content,'سال‌های مالی ثبت‌شده',11,bold=True).pack(anchor='e',pady=8)
             for y in years:

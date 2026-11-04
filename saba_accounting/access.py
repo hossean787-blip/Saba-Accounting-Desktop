@@ -21,18 +21,50 @@ ROLE_PERMISSIONS = {
     "accountant": frozenset({"read", "write", "post", "export", "backup"}),
     "viewer": frozenset({"read", "export"}),
 }
-_METHOD_PERMISSIONS = {"post": "post", "close_fiscal_year": "post", "reverse": "post",
-                       "backup": "backup", "backup_verified": "backup", "verified_backup": "backup",
-                       "tax_export": "export"}
-_WRITE_PREFIXES = ("create_", "new_", "replace_", "update_", "register_", "record_", "set_", "run_")
-_READ_PREFIXES = ("get_", "list_", "preview_", "verify_", "reconcile_", "integration_", "trial_",
-                  "ledger", "income_", "balance_", "companies", "accounts", "fiscal_")
-_READ_METHODS = {
-    "journals", "journal", "dashboard", "statements", "config", "parties", "cashboxes",
-    "cash_flow", "warehouses", "items", "stock_report", "invoices", "budgets", "overview",
-    "integrity_report", "floating_details", "require_floating_detail", "closing_preview",
-    "closing_preview_details", "closure_info", "general_journal", "floating_ledger",
-    "journal_source_summary", "full_integrity_report", "verify_backup_receipt",
+# Every public business-service method is explicit. A newly added method is
+# denied until reviewed and classified; tests enforce coverage of this table.
+PUBLIC_METHOD_PERMISSIONS = {
+    # Core accounting reads
+    "companies": "read", "fiscal_years": "read", "accounts": "read",
+    "journals": "read", "journal": "read", "trial_balance": "read",
+    "trial_balance_detailed": "read", "dashboard": "read", "ledger": "read",
+    "statements": "read", "audit_events": "read",
+    # ERP/finance reads
+    "reference_choices": "read", "config": "read", "parties": "read",
+    "cashboxes": "read", "warehouses": "read", "items": "read",
+    "stock_report": "read", "invoices": "read", "budgets": "read",
+    "overview": "read", "integrity_report": "read", "floating_details": "read",
+    "require_floating_detail": "read", "closing_preview": "read",
+    "closing_preview_details": "read", "verify_fiscal_closure": "read",
+    "closure_info": "read", "trial_balance_levels": "read",
+    "trial_balance_six": "read", "general_journal": "read",
+    "reconcile_accounting_reports": "read", "floating_ledger": "read",
+    "journal_source_summary": "read", "full_integrity_report": "read",
+    "verify_backup_receipt": "read",
+    # Exports
+    "export_trial_detailed_csv": "export", "export_trial_detailed_html": "export",
+    "export_trial_csv": "export", "export_ledger_csv": "export",
+    "export_ledger_html": "export", "export_statements_csv": "export",
+    "tax_export": "export", "export_trial_six_csv": "export",
+    "export_statement_html": "export", "export_general_journal_html": "export",
+    "export_reconciliation_csv": "export", "export_general_journal_csv": "export",
+    "export_closing_preview_html": "export", "export_trial_levels_csv": "export",
+    # Backups
+    "backup": "backup", "verified_backup": "backup", "encrypted_backup": "backup",
+    # Posting/finalization
+    "post": "post", "reverse": "post", "close_fiscal_year": "post",
+    "correct_posted": "post", "create_adjustment": "post",
+    # Mutable master/transaction data
+    "create_company": "write", "create_fiscal_year": "write",
+    "create_account": "write", "new_draft": "write", "replace_draft": "write",
+    "set_root_class": "write", "configure": "write", "create_party": "write",
+    "create_cashbox": "write", "cash_flow": "write", "register_check": "write",
+    "update_check_status": "write", "create_warehouse": "write",
+    "create_item": "write", "invoice": "write", "create_employee": "write",
+    "payroll": "write", "create_asset": "write", "depreciate": "write",
+    "bom_add": "write", "produce": "write", "create_project": "write",
+    "project_cost": "write", "set_budget": "write", "add_floating_detail": "write",
+    "lock_period": "write",
 }
 
 
@@ -344,16 +376,9 @@ class AuthorizedStore:
         target = getattr(self._store, name)
         if not callable(target):
             return target
-        permission = _METHOD_PERMISSIONS.get(name)
+        permission = PUBLIC_METHOD_PERMISSIONS.get(name)
         if permission is None:
-            if name.startswith("export_"):
-                permission = "export"
-            elif name.startswith(_WRITE_PREFIXES):
-                permission = "write"
-            elif name.startswith(_READ_PREFIXES) or name in _READ_METHODS:
-                permission = "read"
-            else:
-                permission = "write"  # fail closed for future public methods
+            raise PermissionDenied("این عملیات در فهرست مجوزهای بازبینی‌شده قرار ندارد.")
 
         def guarded(*args, **kwargs):
             self.session.require(permission)

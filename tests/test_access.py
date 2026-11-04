@@ -7,7 +7,10 @@ from pathlib import Path
 from contextlib import closing
 from saba_accounting.access import (AuthorizedStore, LoginError, PermissionDenied,
                                     UserManager, configured, legacy_login_allowed, set_password,
-                                    verify_password, named_users_configured)
+                                    verify_password, named_users_configured,
+                                    PUBLIC_METHOD_PERMISSIONS)
+from saba_accounting.storage import AccountingStore
+from saba_accounting.erp import ERPStore
 from saba_accounting.finance import FinanceStore
 
 class LocalLoginTests(unittest.TestCase):
@@ -80,6 +83,17 @@ class RoleAndSessionTests(unittest.TestCase):
             wrapped._read_all('SELECT * FROM app_users')
         company = wrapped.create_company('مجاز')
         self.assertEqual(company, wrapped.companies()[0]['id'])
+        self.assertGreaterEqual(len(wrapped.audit_events(company)), 1)
+
+    def test_every_public_business_method_has_explicit_permission(self):
+        methods = {
+            name
+            for cls in (AccountingStore, ERPStore, FinanceStore)
+            for name, value in cls.__dict__.items()
+            if callable(value) and not name.startswith('_')
+        }
+        self.assertEqual(methods, set(PUBLIC_METHOD_PERMISSIONS),
+                         'Every added/removed service method requires an authorization review')
 
     def test_erp_selector_respects_role_and_company(self):
         wrapped = AuthorizedStore(self.store, self.admin)
