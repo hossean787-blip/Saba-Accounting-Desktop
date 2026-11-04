@@ -35,8 +35,10 @@ def main():
             if info.is_dir():
                 continue
             p = PurePosixPath(info.filename.replace("\\", "/"))
-            if p.is_absolute() or ".." in p.parts or p.name in SKIP_NAMES:
+            if p.is_absolute() or ".." in p.parts:
                 raise SystemExit("Rejected path: " + info.filename)
+            if p.name in SKIP_NAMES:
+                continue  # retain repository-owned ignore and publication policy
             if any(part.lower() in SKIP_PARTS for part in p.parts):
                 continue
             if p.suffix.lower() in DENIED_EXT:
