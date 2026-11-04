@@ -37,11 +37,12 @@ def main():
         try:
             if args.verify_backup and not args.restore_backup and not args.restore_to:
                 result = verify_backup(args.verify_backup)
-                print('پشتیبان سالم و رسید معتبر است:', result['sha256'])
+                # ASCII remains reliable in redirected legacy Windows consoles.
+                print('Backup verified; SHA-256:', result['sha256'])
                 return
             if args.restore_backup and args.restore_to and not args.verify_backup:
                 result = restore_to_new_database(args.restore_backup, args.restore_to)
-                print('بازیابی در فایل جدید انجام شد:', result['path'])
+                print('Backup restored to new database:', result['path'])
                 return
             parser.error('برای بازیابی، هر دو گزینه --restore-backup و --restore-to لازم است.')
         except (OSError, ValueError) as exc:

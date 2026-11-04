@@ -1,6 +1,7 @@
 import tempfile
 import sqlite3
 import unittest
+from contextlib import closing
 from pathlib import Path
 from saba_accounting.erp import ERPStore, AccountingError
 
@@ -206,7 +207,9 @@ class ERPTests(unittest.TestCase):
         self.assertEqual(len(self.s.journals(self.c,self.y)),0)
 
     def test_26_database_integrity(self):
-        with self.s._connection() as conn:
+        # sqlite3.Connection's context manager commits/rolls back but does not
+        # close; an explicit close is required before Windows removes temp DBs.
+        with closing(self.s._connection()) as conn:
             self.assertEqual(conn.execute('PRAGMA integrity_check').fetchone()[0],'ok')
             self.assertEqual(conn.execute('PRAGMA foreign_key_check').fetchall(),[])
 

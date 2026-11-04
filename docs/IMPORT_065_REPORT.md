@@ -22,6 +22,12 @@ are present in the imported tree.
 - `python -m unittest discover -s tests -v`: PASS
 - Result: 180 tests passed on Python 3.12/Linux.
 
+The first Windows run exposed two platform-specific defects: a test left its
+SQLite connection open (Windows therefore could not delete the temporary DB),
+and Persian CLI status text could not be encoded by a redirected legacy Windows
+console. Both paths were corrected and are covered by the existing integrity and
+CLI recovery tests.
+
 ## Windows output
 
 Pushes affecting `main.py`, `saba_accounting/`, or `tests/` trigger
